@@ -26,6 +26,11 @@ namespace pbrt_parser {
   using std::cout;
   using std::endl;
 
+  /*! the scene we're exporting. currently a global so material
+    exporter can look up globally named materials., sho;ld probably
+    move this to a 'exporter' class at some time... */
+  std::shared_ptr<Scene> scene;
+  
   FileName basePath = "";
 
   // the output file we're writing.
@@ -36,6 +41,7 @@ namespace pbrt_parser {
   size_t numInstancedTriangles = 0;
   size_t numUniqueObjects = 0;
   size_t numInstances = 0;
+  size_t numMaterials = 0;
 
   std::map<std::shared_ptr<Shape>,int> alreadyExported;
   //! transform used when original instance was emitted
@@ -65,56 +71,185 @@ namespace pbrt_parser {
 
 
   int nextNodeID = 0;
+
+  /*! export a given material, and return its rivl node ID */
+  int exportMaterial(std::shared_ptr<Material> material);
+  
+  /*! export a param we _know_ if a vec3f */
+  std::string exportMaterialParam3f(const std::string &name, std::shared_ptr<Param> _param)
+  {
+    const ParamT<float> *param = dynamic_cast<ParamT<float>*>(_param.get());
+    if (!param)
+      throw std::runtime_error("could not type-cast "+_param->toString()+" to param of floats!?");
+    const std::vector<float> &v = param->paramVec;
+    if (v.size() != 3)
+      throw std::runtime_error("parameter "+_param->toString()+" does not have exactly 3 data element(s)!?");
+
+    std::stringstream ss;
+    ss << " <param name=\"" << name << "\" type=\"float3\">" << v[0] << " " << v[1] << " " << v[2] << "</param>" << std::endl;
+    return ss.str();
+  }
+
+  /*! export a param we _know_ if a float */
+  std::string exportMaterialParam1f(const std::string &name, std::shared_ptr<Param> _param)
+  {
+    const ParamT<float> *param = dynamic_cast<ParamT<float>*>(_param.get());
+    if (!param)
+      throw std::runtime_error("could not type-cast "+_param->toString()+" to param of floats!?");
+    const std::vector<float> &v = param->paramVec;
+    if (v.size() != 1)
+      throw std::runtime_error("parameter "+_param->toString()+" does not have exactly 1 data element(s)!?");
+
+    std::stringstream ss;
+    ss << " <param name=\"" << name << "\" type=\"float\">" << v[0] << "</param>" << std::endl;
+    return ss.str();
+  }
+  
+  /*! export a param we _know_ if a float */
+  std::string exportMaterialParamTexture(const std::string &name, std::shared_ptr<Param> _param)
+  {
+    const ParamT<std::string> *param = dynamic_cast<ParamT<std::string>*>(_param.get());
+    if (!param)
+      throw std::runtime_error("could not type-cast "+_param->toString()+" to param of std::string!?");
+    const std::vector<std::string> &v = param->paramVec;
+    if (v.size() != 1)
+      throw std::runtime_error("parameter "+_param->toString()+" does not have exactly 1 data element(s)!?");
+
+    const std::string textureName = v[0];
+    std::shared_ptr<Texture> texture = scene->namedTexture[textureName];
+    if (!texture)
+      throw std::runtime_error("could not find named texture '"+textureName+"'");
+
+    PRINT(texture->toString());
+    const std::string fileName = texture->getParamString("filename");
+    PRINT(fileName);
+    std::stringstream ss;
+    std::cout << "#pbrt: currently ignoring textures ... :-( " << std::endl;
+    // ss << " <param name=\"" << name << "\" type=\"float\">" << v[0] << "</param>" << std::endl;
+    return ss.str();
+  }
+  
+  /*! export a param we _know_ if a std::string */
+  std::string exportMaterialParamString(const std::string &name, std::shared_ptr<Param> _param)
+  {
+    const ParamT<std::string> *param = dynamic_cast<ParamT<std::string>*>(_param.get());
+    if (!param)
+      throw std::runtime_error("could not type-cast "+_param->toString()+" to param of std::string's!?");
+    const std::vector<std::string> &v = param->paramVec;
+    if (v.size() != 1)
+      throw std::runtime_error("parameter "+_param->toString()+" does not have exactly 1 data element(s)!?");
+
+    std::stringstream ss;
+#if 1
+    std::cout << "#pbrt: warning - rivl can't handle strings yet ... :-(" << std::endl;
+    std::cout << "#pbrt:  in: " << name << " = " << _param->toString() << std::endl;
+#else
+    ss << " <param name=\"" << name << "\" type=\"string\">" << v[0] << "</param>";
+#endif
+    return ss.str();
+  }
+  
+  /*! export a param we _know_ if a std::string */
+  std::string exportMaterialParamMaterial(const std::string &name, std::shared_ptr<Param> _param)
+  {
+    const ParamT<std::string> *param = dynamic_cast<ParamT<std::string>*>(_param.get());
+    if (!param)
+      throw std::runtime_error("could not type-cast "+_param->toString()+" to param of std::string's!?");
+    const std::vector<std::string> &v = param->paramVec;
+    if (v.size() != 1)
+      throw std::runtime_error("parameter "+_param->toString()+" does not have exactly 1 data element(s)!?");
+
+    std::stringstream ss;
+
+    std::string childMatName = v[0];
+    std::shared_ptr<Material> childMat = scene->namedMaterial[childMatName];
+    int childMatID = exportMaterial(childMat);
+    if (!childMat)
+      throw std::runtime_error("trying to export material named '"+childMatName+"' that doesn't seem to exist!?");
+    ss << " <param name=\"" << name << "\" type=\"material\">" << childMatID << "</param>";
     
+    return ss.str();
+  }
+  
+  
+  /*! export a general material parameter, whicever it might be. if
+      this includes additional references like textures, other
+      mateirals, etc, those will get recursively exported first */
+  std::string exportMaterialParam(/*! the material we're in - for debugging outsputs only */
+                                  std::shared_ptr<Material> material,
+                                  /*! name of the parameter */
+                                  const std::string &name,
+                                  /*! data values of the parameter */
+                                  std::shared_ptr<Param> param)
+  {
+    /* ugh - this is really ugly in pbrt - mateirals have type
+       'string', so we have to detect that here based on hardcoded
+       material and parameter name(s) */
+    if (material->type == "mix" && name == "namedmaterial1") 
+      return exportMaterialParamMaterial(name,param);
+    if (material->type == "mix" && name == "namedmaterial2") 
+      return exportMaterialParamMaterial(name,param);
+
+    
+    const std::string type = param->getType();
+    if (type == "color" || type == "rgb")
+      return exportMaterialParam3f(name,param);
+    else if (type == "texture")
+      return exportMaterialParamTexture(name,param);
+    else if (type == "float")
+      return exportMaterialParam1f(name,param);
+    else if (type == "float")
+      return exportMaterialParamTexture(name,param);
+    else if (type == "string")
+      return exportMaterialParamString(name,param);
+    else {
+      std::cout << "#pbrt: WARNING - don't know what to do with material param "
+                << material->type << "::" << name << " = " << param->toString() << std::endl;
+      return "";
+    }
+  }
+  
+  /*! export a given material, and return its rivl node ID */
   int exportMaterial(std::shared_ptr<Material> material)
   {
     if (!material) 
       // default material
       return 0;
-
+    
+    // std::cout << "-------------------------------------------------------" << std::endl;
+    // std::cout << "exporting material " << material->type << std::endl;
+    // std::cout << "-------------------------------------------------------" << std::endl;
+    
     static std::map<std::shared_ptr<Material>,int> alreadyExported;
     if (alreadyExported.find(material) != alreadyExported.end())
       return alreadyExported[material];
-
-    const std::string type = material->type;
-
-    if (type == "uber") {
-      std::stringstream ss;
-      ss << "<Material name=\"doesntMatter\" type=\"OBJMaterial\">" << endl;
-      {
-        vec3f v;
-        try {
-          v = material->getParam3f("Kd",vec3f(0.0f));
-        } catch (std::runtime_error e) {
-          v = vec3f(.6f);
-        };
-        ss << "  <param name=\"kd\" type=\"float3\">" << v.x << " " << v.y << " " << v.z << "</param>" << endl;
-      }
-      ss << "</Material>" << endl;
-      fprintf(out,"%s\n",ss.str().c_str());
-      int thisID = nextNodeID++;
-      alreadyExported[material] = thisID;
-      return thisID;
-    } else {
-      std::stringstream ss;
-      vec3f v = vec3f(.3f);
-      ss << "<Material name=\"doesntMatter\" type=\"OBJMaterial\">" << endl;
-      ss << "  <param name=\"kd\" type=\"float3\">" << v.x << " " << v.y << " " << v.z << "</param>" << endl;
-      printf("WARNING: UNHANDLED MATERIAL TYPE '%s'!!!\n",type.c_str());
-      ss << "</Material>" << endl;
-
-      fprintf(out,"%s\n",ss.str().c_str());
-      int thisID = nextNodeID++;
-      alreadyExported[material] = thisID;
-      return thisID;
+    
+    std::stringstream ss;
+    for (auto paramPair : material->param) {
+      const std::string name = paramPair.first;
+      auto param = paramPair.second;
+      ss << exportMaterialParam(material,name,param);
     }
+    
+
+    int thisID = nextNodeID++;
+    alreadyExported[material] = thisID;
+
+    fprintf(out,"<Material name=\"ignore\" type=\"%s\" id=\"%i\">\n",material->type.c_str(),thisID);
+    // ss << "<Material name=\"doesntMatter\" type=\""<< material->type << "\">" << endl;
+    fprintf(out,"%s",ss.str().c_str());
+    // ss << "</Material>" << std::endl;
+    fprintf(out,"</Material>\n");
+    
+    numMaterials++;
+    return thisID;
   }
 
   int writeTriangleMesh(std::shared_ptr<Shape> shape, const affine3f &instanceXfm)
   {
     numUniqueObjects++;
     std::shared_ptr<Material> mat = shape->material;
-    cout << "writing shape " << shape->toString() << " w/ material " << (mat?mat->toString():"<null>") << endl;
+    // cout << "writing shape " << shape->toString() << " w/ material " << (mat?mat->toString():"<null>") << endl;
 
     int materialID = exportMaterial(shape->material);
 
@@ -179,7 +314,7 @@ namespace pbrt_parser {
       
     numUniqueObjects++;
     std::shared_ptr<Material> mat = shape->material;
-    cout << "writing shape " << shape->toString() << " w/ material " << (mat?mat->toString():"<null>") << endl;
+    int materialID = exportMaterial(shape->material);
 
     std::shared_ptr<ParamT<std::string> > param_fileName = shape->findParam<std::string>("filename");
     FileName fn = FileName(basePath) + param_fileName->paramVec[0];
@@ -192,7 +327,7 @@ namespace pbrt_parser {
       
     // -------------------------------------------------------
     fprintf(out,"<Mesh id=\"%i\">\n",thisID);
-    fprintf(out,"  <materiallist>0</materiallist>\n");
+    fprintf(out,"  <materiallist>%i</materiallist>\n",materialID);
 
     // -------------------------------------------------------
     fprintf(out,"  <vertex num=\"%li\" ofs=\"%li\"/>\n",
@@ -284,12 +419,25 @@ namespace pbrt_parser {
     }      
   }
 
+  void usage(const std::string &errMsg = "")
+  {
+    if (!errMsg.empty())
+      std::cout << "Error: " << errMsg << std::endl << std::endl;
+    
+    std::cout << "Usage:  ./pbrt2rivl inFileName.pbrt -o outFileName.xml [args]" << std::endl;
+    std::cout << "w/ args: " << std::endl;
+    std::cout << "  -o <filename.xml>       specify out-filename" << std::endl;
+    std::cout << "  -h|--help               print this help message" << std::endl;
+    std::cout << "  -path <input-path>      path to scene file, if required (usually it isn't)" << std::endl;
 
-  void pbrt2obj(int ac, char **av)
+    exit(errMsg != "");
+  }
+
+  void pbrt2rivl(int ac, char **av)
   {
     std::vector<std::string> fileName;
     bool dbg = false;
-    std::string outFileName = "a.xml";
+    std::string outFileName = "";
     for (int i=1;i<ac;i++) {
       const std::string arg = av[i];
       if (arg[0] == '-') {
@@ -297,6 +445,8 @@ namespace pbrt_parser {
           dbg = true;
         else if (arg == "--path" || arg == "-path")
           basePath = av[++i];
+        else if (arg == "-h"|| arg == "--help")
+          usage();
         else if (arg == "-o")
           outFileName = av[++i];
         else
@@ -305,6 +455,9 @@ namespace pbrt_parser {
         fileName.push_back(arg);
       }          
     }
+    if (fileName.empty()) usage("no pbrt input file name(s) specified");
+    if (outFileName.empty()) usage("no output file name specified (-o)");
+
     out = fopen(outFileName.c_str(),"w");
     bin = fopen((outFileName+".bin").c_str(),"w");
     assert(out);
@@ -334,9 +487,9 @@ namespace pbrt_parser {
     
       std::cout << "==> parsing successful (grammar only for now)" << std::endl;
     
-      std::shared_ptr<Scene> scene = parser->getScene();
+      scene = parser->getScene();
       writeObject(scene->world,ospcommon::one);
-
+      scene = nullptr;
       {
         int thisID = nextNodeID++;
         fprintf(out,"<Group id=\"%i\" numChildren=\"%lu\">\n",thisID,rootObjects.size());
@@ -354,6 +507,7 @@ namespace pbrt_parser {
       cout << " - num instances (inc.1sts) " << prettyNumber(numInstances) << endl;
       cout << " - unique triangles written " << prettyNumber(numUniqueTriangles) << endl;
       cout << " - instanced tris written   " << prettyNumber(numUniqueTriangles+numInstancedTriangles) << endl;
+      cout << " - num materials            " << prettyNumber(numMaterials) << endl;
     } catch (std::runtime_error e) {
       std::cout << "**** ERROR IN PARSING ****" << std::endl << e.what() << std::endl;
       exit(1);
@@ -364,6 +518,6 @@ namespace pbrt_parser {
 
 int main(int ac, char **av)
 {
-  pbrt_parser::pbrt2obj(ac,av);
+  pbrt_parser::pbrt2rivl(ac,av);
   return 0;
 }

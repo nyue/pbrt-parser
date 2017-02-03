@@ -88,9 +88,6 @@ namespace pbrt_parser {
     std::shared_ptr<Scene>    scene;
     std::shared_ptr<Object>   currentObject;
     std::shared_ptr<Material> currentMaterial;
-    std::map<std::string,std::shared_ptr<Object> >   namedObjects;
-    std::map<std::string,std::shared_ptr<Material> > namedMaterial;
-    std::map<std::string,std::shared_ptr<Texture> >  namedTexture;
   };
 
   PBRT_PARSER_INTERFACE void parsePLY(const std::string &fileName,

@@ -145,16 +145,16 @@ namespace pbrt_parser {
 
     std::shared_ptr<Object> Parser::findNamedObject(const std::string &name, bool createIfNotExist)
     {
-      if (namedObjects.find(name) == namedObjects.end()) {
+      if (scene->namedObjects.find(name) == scene->namedObjects.end()) {
 
         if (createIfNotExist) {
           std::shared_ptr<Object> object = std::make_shared<Object>(name);
-          namedObjects[name] = object;
+          scene->namedObjects[name] = object;
         } else {
           throw std::runtime_error("could not find object named '"+name+"'");
         }
       }
-      return namedObjects[name];
+      return scene->namedObjects[name];
     }
 
 
@@ -289,6 +289,7 @@ namespace pbrt_parser {
       cout << "Parsing PBRT World" << endl;
       while (1) {
         std::shared_ptr<Token> token = getNextToken();
+        const Loc loc = token->loc;
         assert(token);
         if (token->text == "WorldEnd") {
           cout << "Parsing PBRT World - done!" << endl;
@@ -316,7 +317,7 @@ namespace pbrt_parser {
         if (token->text == "Material") {
           std::string type = tokens->next()->text;
           std::shared_ptr<Material> material
-            = std::make_shared<Material>(type);
+            = std::make_shared<Material>(loc,type);
           parseParams(material->param,*tokens);
           currentMaterial = material;
           continue;
@@ -326,16 +327,16 @@ namespace pbrt_parser {
           std::string texelType = tokens->next()->text;
           std::string mapType = tokens->next()->text;
           std::shared_ptr<Texture> texture
-            = std::make_shared<Texture>(name,texelType,mapType);
-          namedTexture[name] = texture;
+            = std::make_shared<Texture>(loc,name,texelType,mapType);
+          scene->namedTexture[name] = texture;
           parseParams(texture->param,*tokens);
           continue;
         }
         if (token->text == "MakeNamedMaterial") {
           std::string name = tokens->next()->text;
           std::shared_ptr<Material> material
-            = std::make_shared<Material>("<implicit>");
-          namedMaterial[name] = material;
+            = std::make_shared<Material>(loc,"<implicit>");
+          scene->namedMaterial[name] = material;
           parseParams(material->param,*tokens);
 
           /* named material have the parameter type implicitly as a
@@ -355,7 +356,7 @@ namespace pbrt_parser {
         if (token->text == "NamedMaterial") {
           // USE named material
           std::string name = tokens->next()->text;
-          currentMaterial = namedMaterial[name];
+          currentMaterial = scene->namedMaterial[name];
           continue;
         }
 

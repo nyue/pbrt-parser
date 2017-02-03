@@ -16,7 +16,8 @@
 
 #pragma once
 
-#include "pbrt/pbrt.h"
+#include "pbrt.h"
+#include "Loc.h"
 // stl
 #include <map>
 #include <vector>
@@ -51,6 +52,8 @@ namespace pbrt_parser {
   /*! any class that can store (and query) parameters */
   struct PBRT_PARSER_INTERFACE Parameterized {
 
+    std::string getParamString(const std::string &name) const;
+    float getParam1f(const std::string &name) const;
     vec3f getParam3f(const std::string &name, const vec3f &fallBack) const;
 
     template<typename T>
@@ -71,7 +74,7 @@ namespace pbrt_parser {
   };
 
   struct PBRT_PARSER_INTERFACE Material : public Parameterized {
-    Material(const std::string &type) : type(type) {};
+    Material(const Loc &loc, const std::string &type) : loc(loc), type(type) {};
 
     /*! pretty-print this material (for debugging) */
     std::string toString() const;
@@ -83,19 +86,28 @@ namespace pbrt_parser {
       command; for the 'makenamedmaterial' it uses an implicit
       'type' parameter */
     std::string type;
+
+    /*! where this object was defined */
+    const Loc loc;
   };
 
-  struct PBRT_PARSER_INTERFACE Texture {
+  struct PBRT_PARSER_INTERFACE Texture : public Parameterized {
     std::string name;
     std::string texelType;
     std::string mapType;
 
-    Texture(const std::string &name,
+    Texture(const Loc &loc,
+            const std::string &name,
             const std::string &texelType,
             const std::string &mapType) 
-      : name(name), texelType(texelType), mapType(mapType)
+      : loc(loc), name(name), texelType(texelType), mapType(mapType)
     {};
-    std::map<std::string,std::shared_ptr<Param> > param;
+
+    /*! pretty-print this material (for debugging) */
+    std::string toString() const;
+
+    /*! where this object was defined */
+    const Loc loc;
   };
 
   struct PBRT_PARSER_INTERFACE Node : public Parameterized {
@@ -218,6 +230,9 @@ namespace pbrt_parser {
       world = std::make_shared<Object>("<root>");
     };
 
+    //! find the given named object
+    std::shared_ptr<Object> findNamedObject(const std::string &name);
+    
     //! list of cameras defined in this object
     std::vector<std::shared_ptr<Camera> > cameras;
 
@@ -241,6 +256,12 @@ namespace pbrt_parser {
 
     //! the 'world' scene geometry
     std::shared_ptr<Object> world;
+
+    //! @{ list of all named objects in the scene
+    std::map<std::string,std::shared_ptr<Object> >   namedObjects;
+    std::map<std::string,std::shared_ptr<Material> > namedMaterial;
+    std::map<std::string,std::shared_ptr<Texture> >  namedTexture;
+    //! @}
   };
 
 } // ::pbrt_parser

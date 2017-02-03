@@ -110,8 +110,22 @@ namespace pbrt_parser {
   template struct ParamT<std::string>;
 
   // ==================================================================
-  // Shape
+  // Parameterized
   // ==================================================================
+  std::string Parameterized::getParamString(const std::string &name) const
+  {
+    std::map<std::string,std::shared_ptr<Param> >::const_iterator it=param.find(name);
+    if (it == param.end())
+      throw std::runtime_error("parameter not found");
+    std::shared_ptr<Param> pr = it->second;
+    const std::shared_ptr<ParamT<std::string>> p = std::dynamic_pointer_cast<ParamT<std::string>>(pr);
+    if (!p)
+      throw std::runtime_error("found param of given name, but of wrong type!");
+    if (p->getSize() != 1)
+      throw std::runtime_error("found param of given name and type, but wrong number of components!");
+    return p->paramVec[0];
+  }
+  
   vec3f Parameterized::getParam3f(const std::string &name, const vec3f &fallBack) const
   {
     std::map<std::string,std::shared_ptr<Param> >::const_iterator it=param.find(name);
@@ -120,10 +134,24 @@ namespace pbrt_parser {
     std::shared_ptr<Param> pr = it->second;
     const std::shared_ptr<ParamT<float>> p = std::dynamic_pointer_cast<ParamT<float>>(pr);
     if (!p)
-      throw std::runtime_error("Parameterized::getParam3f: found param of given name, but of wrong type!");
+      throw std::runtime_error("found param of given name, but of wrong type!");
     if (p->getSize() != 3)
-      throw std::runtime_error("Parameterized::getParam3f: found param of given name and type, but wrong number of components!");
+      throw std::runtime_error("found param of given name and type, but wrong number of components!");
     return vec3f(p->paramVec[0],p->paramVec[1],p->paramVec[2]);
+  }
+  
+  float Parameterized::getParam1f(const std::string &name) const
+  {
+    std::map<std::string,std::shared_ptr<Param> >::const_iterator it=param.find(name);
+    if (it == param.end())
+      throw std::runtime_error("could not find parameter '"+name+"'");
+    std::shared_ptr<Param> pr = it->second;
+    const std::shared_ptr<ParamT<float>> p = std::dynamic_pointer_cast<ParamT<float>>(pr);
+    if (!p)
+      throw std::runtime_error("found param of given name, but of wrong type!");
+    if (p->getSize() != 1)
+      throw std::runtime_error("found param of given name and type, but wrong number of components!");
+    return p->paramVec[0];
   }
 
   // ==================================================================
@@ -156,4 +184,31 @@ namespace pbrt_parser {
     return ss.str();
   }
 
+  // ==================================================================
+  // Texture
+  // ==================================================================
+  std::string Texture::toString() const
+  {
+    std::stringstream ss;
+    ss << "Texture {" << endl;
+    for (std::map<std::string,std::shared_ptr<Param> >::const_iterator it=param.begin(); 
+         it != param.end(); it++) {
+      ss << " - " << it->first << " : " << it->second->toString() << endl;
+    }
+    ss << "}" << endl;
+    return ss.str();
+  }
+
+  // ==================================================================
+  // Scene
+  // ==================================================================
+  std::shared_ptr<Object> Scene::findNamedObject(const std::string &name)
+  {
+    auto it = namedObjects.find(name);
+    if (it == namedObjects.end()) {
+      throw std::runtime_error("could not find object named '"+name+"'");
+    }
+    return it->second;
+  }
+  
 } // ::pbrt_parser

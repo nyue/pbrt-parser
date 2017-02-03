@@ -16,42 +16,9 @@
 
 #pragma once
 
-#include "pbrt/pbrt.h"
-// stl
-#include <queue>
-#include <memory>
+#include "Loc.h"
 
 namespace pbrt_parser {
-
-  /*! file name and handle, to be used by tokenizer and loc */
-  struct PBRT_PARSER_INTERFACE File {
-    File(const FileName &fn);
-    /*! get name of the file */
-    std::string getFileName() const { return name; }
-
-    friend class Lexer;
-
-  private:
-    FileName name;
-    FILE *file;
-  };
-
-  /*! struct referring to a 'loc'ation in the input stream, given by
-    file name and line number */
-  struct PBRT_PARSER_INTERFACE Loc { 
-    //! constructor
-    Loc(std::shared_ptr<File> file);
-    //! copy-constructor
-    Loc(const Loc &loc);
-      
-    //! pretty-print
-    std::string toString() const;
-
-    friend class Lexer;
-  private:
-    std::shared_ptr<File> file;
-    int line, col;
-  };
 
   struct PBRT_PARSER_INTERFACE Token {
 
@@ -72,7 +39,6 @@ namespace pbrt_parser {
     const std::string text;
     const Type        type;
   };
-
 
   /*! class that does the lexing - ie, the breaking up of an input
     stream of chars into an input stream of tokens.  */

@@ -20,6 +20,7 @@ ADD_LIBRARY(pbrt_parser SHARED
   Scene.cpp
   parsePLY.cpp
   ../3rdParty/ply.cpp
+  ../3rdParty/picopng.cpp
   )
 TARGET_LINK_LIBRARIES(pbrt_parser ospray_common)
 
