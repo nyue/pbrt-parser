@@ -33,7 +33,7 @@
 namespace pbrt_parser {
 
   /*! file name and handle, to be used by tokenizer and loc */
-  struct PBRT_PARSER_INTERFACE File {
+  struct File {
     File(const FileName &fn);
     
     /*! get name of the file */
@@ -48,8 +48,9 @@ namespace pbrt_parser {
         return /home/mine/model/myModel/textures/myTex.png. This is
         what this helper fct does...
     */
-    FileName resolveRelativeFileName(const FileName &fileRelativeToLoc) const {
-      return name.path()+fileRelativeToLoc.str();
+    FileName resolveRelativeFileName(const std::string &fileRelativeToLoc) const
+    {
+      return name.path()+fileRelativeToLoc;
     }
       
     friend class Lexer;
@@ -61,7 +62,8 @@ namespace pbrt_parser {
 
   /*! struct referring to a 'loc'ation in the input stream, given by
     file name and line number */
-  struct PBRT_PARSER_INTERFACE Loc { 
+  struct // PBRT_PARSER_INTERFACE
+  Loc { 
     //! constructor
     Loc(std::shared_ptr<File> file);
     //! copy-constructor
@@ -70,6 +72,9 @@ namespace pbrt_parser {
     //! pretty-print
     std::string toString() const;
 
+    FileName resolveRelativeFileName(const std::string &fileRelativeToLoc) const
+    { return file->resolveRelativeFileName(fileRelativeToLoc); }
+    
     friend class Lexer;
   private:
     std::shared_ptr<File> file;

@@ -21,6 +21,15 @@
 #include <vector>
 #include <sstream>
 
+/*! see 3rdparty/picopng */
+int decodePNG(std::vector<unsigned char>& out_image,
+              unsigned long& image_width,
+              unsigned long& image_height,
+              const unsigned char* in_png,
+              size_t in_size,
+              bool convert_to_rgba32 = true);
+
+
 namespace pbrt_parser {
 
   using std::cout;
@@ -104,7 +113,70 @@ namespace pbrt_parser {
     ss << " <param name=\"" << name << "\" type=\"float\">" << v[0] << "</param>" << std::endl;
     return ss.str();
   }
-  
+
+  /*! check if given texture file name is already im/exported, and if
+      so, return the node id we used when exporting it first; if not,
+      try to load it, export it, and return the node id used to do
+      so. if we could not load, return negative error code */
+  int loadAndExportTexture(const FileName &resolvedFileName)
+  {
+    std::map<std::string,int> alreadyExported;
+    if (alreadyExported.find(resolvedFileName.str()) != alreadyExported.end())
+      return alreadyExported[resolvedFileName.str()];
+    
+    try {
+      FILE *file = fopen(resolvedFileName.str().c_str(),"rb");
+      if (!file) 
+        throw std::runtime_error("could not open file");
+      
+      const std::string ext = resolvedFileName.ext();
+      if (ext != "png")
+        throw std::runtime_error("not in png format - can only do png right now");
+      
+      // read in file's content
+      fseek(file,0,SEEK_END);
+      size_t fileSize = ftell(file);
+      fseek(file,0,SEEK_SET);
+      unsigned char *mem = (unsigned char *)malloc(fileSize);
+      size_t numRead = fread(mem,1,fileSize,file);
+      assert(numRead == fileSize);
+      fclose(file);
+      
+      // see 3rdparty/picopng :
+      std::vector<unsigned char> decoded;
+      unsigned long width=0, height=0;
+      if (0 != decodePNG(decoded,width,height,mem,fileSize,true))
+        throw std::runtime_error("picopng reported some error trying to decode png from file :-(");
+
+      int nodeID = nextNodeID++;
+      size_t binFileOfs = ftell(bin);
+      fwrite(decoded.data(),sizeof(uint32_t),width*height,bin);
+      std::stringstream ss;
+      ss << "<Texture2D "
+         << "id=\"" << nodeID << "\" "
+         << "format=\"RGBA/raw\" "
+         << "width=\"" << width << "\" "
+         << "height=\"" << height << "\" "
+         << "channels=\"4\" "
+         << "depth=\"1\" "
+         << "ofs=\"" << binFileOfs
+         << "\" />";
+      fprintf(out,"%s\n",ss.str().c_str());
+      
+      alreadyExported[resolvedFileName.str()] = nodeID;
+
+      std::cout << "#pbrt_parser: successfully read and exported "
+                << width << "x" << height << " tex " << resolvedFileName.str() << std::endl;
+      return nodeID;
+    }
+    catch (std::runtime_error e) {
+      std::cout << "#pbrt_parser: error loading texture ("+resolvedFileName.str()+") : "+e.what() << std::endl;
+      alreadyExported[resolvedFileName.str()] = -1;
+    }
+    return alreadyExported[resolvedFileName.str()];
+}
+
+
   /*! export a param we _know_ if a float */
   std::string exportMaterialParamTexture(const std::string &name, std::shared_ptr<Param> _param)
   {
@@ -115,17 +187,24 @@ namespace pbrt_parser {
     if (v.size() != 1)
       throw std::runtime_error("parameter "+_param->toString()+" does not have exactly 1 data element(s)!?");
 
+    // =======================================================
+    // first, generate file name that contains that texture
+    // =======================================================
     const std::string textureName = v[0];
     std::shared_ptr<Texture> texture = scene->namedTexture[textureName];
     if (!texture)
       throw std::runtime_error("could not find named texture '"+textureName+"'");
 
-    PRINT(texture->toString());
-    const std::string fileName = texture->getParamString("filename");
-    PRINT(fileName);
+    const FileName resolvedFileName =
+      texture->loc.resolveRelativeFileName(texture->getParamString("filename"));
+
+    const int texNodeID = loadAndExportTexture(resolvedFileName);
+
     std::stringstream ss;
-    std::cout << "#pbrt: currently ignoring textures ... :-( " << std::endl;
-    // ss << " <param name=\"" << name << "\" type=\"float\">" << v[0] << "</param>" << std::endl;
+    if (texNodeID >= 0)
+      ss << " <param name=\"" << name << "\" type=\"texture\">" << texNodeID << "</param>" << std::endl;
+    else
+      std::cout << "#pbrt_parser: warning - error in im/exporting texture " << resolvedFileName.str() << std::endl;
     return ss.str();
   }
   
