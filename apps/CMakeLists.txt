@@ -19,3 +19,6 @@ TARGET_LINK_LIBRARIES(pbrt2rivl pbrt_parser)
 
 ADD_EXECUTABLE(pbrt2obj pbrt2obj.cpp)
 TARGET_LINK_LIBRARIES(pbrt2obj pbrt_parser)
+
+ADD_EXECUTABLE(pbrt2ospray pbrt2ospray.cpp)
+TARGET_LINK_LIBRARIES(pbrt2ospray pbrt_parser)

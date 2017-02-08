@@ -52,6 +52,11 @@ namespace pbrt_parser {
   /*! any class that can store (and query) parameters */
   struct PBRT_PARSER_INTERFACE Parameterized {
 
+    Parameterized(const Loc &loc) : loc(loc) {}
+    
+    /*! pretty-print this material (for debugging) */
+    virtual std::string toString() const = 0;
+    
     std::string getParamString(const std::string &name) const;
     float getParam1f(const std::string &name) const;
     vec3f getParam3f(const std::string &name, const vec3f &fallBack) const;
@@ -64,6 +69,9 @@ namespace pbrt_parser {
     }
 
     std::map<std::string,std::shared_ptr<Param> > param;
+
+    /*! where this object was defined */
+    const Loc loc;
   };
 
   struct PBRT_PARSER_INTERFACE Attributes {
@@ -72,12 +80,15 @@ namespace pbrt_parser {
 
     virtual std::shared_ptr<Attributes> clone() const { return std::make_shared<Attributes>(*this); }
   };
-
+  
   struct PBRT_PARSER_INTERFACE Material : public Parameterized {
-    Material(const Loc &loc, const std::string &type) : loc(loc), type(type) {};
-
+    Material(const Loc &loc, const std::string &type)
+      : Parameterized(loc),
+      type(type)
+      {}
+    
     /*! pretty-print this material (for debugging) */
-    std::string toString() const;
+    virtual std::string toString() const override;
 
     /*! the 'type' of the material, such as 'uber'material, 'matte',
       'mix' etc. Note that the PBRT format has two inconsistent
@@ -86,9 +97,6 @@ namespace pbrt_parser {
       command; for the 'makenamedmaterial' it uses an implicit
       'type' parameter */
     std::string type;
-
-    /*! where this object was defined */
-    const Loc loc;
   };
 
   struct PBRT_PARSER_INTERFACE Texture : public Parameterized {
@@ -100,18 +108,18 @@ namespace pbrt_parser {
             const std::string &name,
             const std::string &texelType,
             const std::string &mapType) 
-      : loc(loc), name(name), texelType(texelType), mapType(mapType)
+      : Parameterized(loc), name(name), texelType(texelType), mapType(mapType)
     {};
 
     /*! pretty-print this material (for debugging) */
-    std::string toString() const;
-
-    /*! where this object was defined */
-    const Loc loc;
+    virtual std::string toString() const;
   };
 
   struct PBRT_PARSER_INTERFACE Node : public Parameterized {
-    Node(const std::string &type) : type(type) {};
+    Node(const Loc &loc,
+         const std::string &type)
+      : Parameterized(loc), type(type)
+    {}
     virtual std::string toString() const { return type; }
 
     const std::string type;
@@ -119,23 +127,23 @@ namespace pbrt_parser {
   };
 
   struct PBRT_PARSER_INTERFACE Camera : public Node {
-    Camera(const std::string &type) : Node(type) {};
+    Camera(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
 
   struct PBRT_PARSER_INTERFACE Sampler : public Node {
-    Sampler(const std::string &type) : Node(type) {};
+    Sampler(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
   struct PBRT_PARSER_INTERFACE Integrator : public Node {
-    Integrator(const std::string &type) : Node(type) {};
+    Integrator(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
   struct PBRT_PARSER_INTERFACE SurfaceIntegrator : public Node {
-    SurfaceIntegrator(const std::string &type) : Node(type) {};
+    SurfaceIntegrator(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
   struct PBRT_PARSER_INTERFACE VolumeIntegrator : public Node {
-    VolumeIntegrator(const std::string &type) : Node(type) {};
+    VolumeIntegrator(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
   struct PBRT_PARSER_INTERFACE PixelFilter : public Node {
-    PixelFilter(const std::string &type) : Node(type) {};
+    PixelFilter(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
 
   /*! a PBRT 'geometric shape' (a geometry in ospray terms) - ie,
@@ -143,7 +151,7 @@ namespace pbrt_parser {
     surface(s) that a ray can intersect*/
   struct PBRT_PARSER_INTERFACE Shape : public Node {
     /*! constructor */
-    Shape(const std::string &type,
+    Shape(const Loc &loc,const std::string &type,
           std::shared_ptr<Material>   material,
           std::shared_ptr<Attributes> attributes,
           affine3f &transform);
@@ -158,27 +166,27 @@ namespace pbrt_parser {
   };
 
   struct PBRT_PARSER_INTERFACE Volume : public Node {
-    Volume(const std::string &type) : Node(type) {};
+    Volume(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
 
   struct PBRT_PARSER_INTERFACE LightSource : public Node {
-    LightSource(const std::string &type) : Node(type) {};
+    LightSource(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
 
   struct PBRT_PARSER_INTERFACE AreaLightSource : public Node {
-    AreaLightSource(const std::string &type) : Node(type) {};
+    AreaLightSource(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
 
   struct PBRT_PARSER_INTERFACE Film : public Node {
-    Film(const std::string &type) : Node(type) {};
+    Film(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
 
   struct PBRT_PARSER_INTERFACE Accelerator : public Node {
-    Accelerator(const std::string &type) : Node(type) {};
+    Accelerator(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
 
   struct PBRT_PARSER_INTERFACE Renderer : public Node {
-    Renderer(const std::string &type) : Node(type) {};
+    Renderer(const Loc &loc,const std::string &type) : Node(loc,type) {};
   };
 
   // a "LookAt" in the pbrt file has three vec3fs, no idea what for

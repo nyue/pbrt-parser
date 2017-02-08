@@ -300,14 +300,14 @@ namespace pbrt_parser {
         // -------------------------------------------------------
         if (token->text == "LightSource") {
           std::shared_ptr<LightSource> lightSource
-            = std::make_shared<LightSource>(tokens->next()->text);
+            = std::make_shared<LightSource>(token->loc,tokens->next()->text);
           parseParams(lightSource->param,*tokens);
           getCurrentObject()->lightSources.push_back(lightSource);
           continue;
         }
         if (token->text == "AreaLightSource") {
           std::shared_ptr<AreaLightSource> lightSource
-            = std::make_shared<AreaLightSource>(tokens->next()->text);
+            = std::make_shared<AreaLightSource>(token->loc,tokens->next()->text);
           parseParams(lightSource->param,*tokens);
           continue;
         }
@@ -376,7 +376,8 @@ namespace pbrt_parser {
         // -------------------------------------------------------
         if (token->text == "Shape") {
           std::shared_ptr<Shape> shape
-            = std::make_shared<Shape>(tokens->next()->text,
+            = std::make_shared<Shape>(token->loc,
+                                      tokens->next()->text,
                                       currentMaterial,
                                       attributesStack.top()->clone(),
                                       transformStack.top());
@@ -389,7 +390,7 @@ namespace pbrt_parser {
         // -------------------------------------------------------
         if (token->text == "Volume") {
           std::shared_ptr<Volume> volume
-            = std::make_shared<Volume>(tokens->next()->text);
+            = std::make_shared<Volume>(token->loc,tokens->next()->text);
           parseParams(volume->param,*tokens);
           getCurrentObject()->volumes.push_back(volume);
           continue;
@@ -522,60 +523,68 @@ namespace pbrt_parser {
           continue;
         }
         if (token->text == "Camera") {
-          std::shared_ptr<Camera> camera = std::make_shared<Camera>(tokens->next()->text);
+          std::shared_ptr<Camera> camera
+            = std::make_shared<Camera>(token->loc,tokens->next()->text);
           parseParams(camera->param,*tokens);
           scene->cameras.push_back(camera);
           continue;
         }
         if (token->text == "Sampler") {
-          std::shared_ptr<Sampler> sampler = std::make_shared<Sampler>(tokens->next()->text);
+          std::shared_ptr<Sampler> sampler
+            = std::make_shared<Sampler>(token->loc,tokens->next()->text);
           parseParams(sampler->param,*tokens);
           scene->sampler = sampler;
           continue;
         }
         if (token->text == "Integrator") {
-          std::shared_ptr<Integrator> integrator = std::make_shared<Integrator>(tokens->next()->text);
+          std::shared_ptr<Integrator> integrator
+            = std::make_shared<Integrator>(token->loc,tokens->next()->text);
           parseParams(integrator->param,*tokens);
           scene->integrator = integrator;
           continue;
         }
         if (token->text == "SurfaceIntegrator") {
           std::shared_ptr<SurfaceIntegrator> surfaceIntegrator
-            = std::make_shared<SurfaceIntegrator>(tokens->next()->text);
+            = std::make_shared<SurfaceIntegrator>(token->loc,tokens->next()->text);
           parseParams(surfaceIntegrator->param,*tokens);
           scene->surfaceIntegrator = surfaceIntegrator;
           continue;
         }
         if (token->text == "VolumeIntegrator") {
           std::shared_ptr<VolumeIntegrator> volumeIntegrator
-            = std::make_shared<VolumeIntegrator>(tokens->next()->text);
+            = std::make_shared<VolumeIntegrator>(token->loc,tokens->next()->text);
           parseParams(volumeIntegrator->param,*tokens);
           scene->volumeIntegrator = volumeIntegrator;
           continue;
         }
         if (token->text == "PixelFilter") {
-          std::shared_ptr<PixelFilter> pixelFilter = std::make_shared<PixelFilter>(tokens->next()->text);
+          std::shared_ptr<PixelFilter> pixelFilter
+            = std::make_shared<PixelFilter>(token->loc,tokens->next()->text);
           parseParams(pixelFilter->param,*tokens);
           scene->pixelFilter = pixelFilter;
           continue;
         }
         if (token->text == "Accelerator") {
-          std::shared_ptr<Accelerator> accelerator = std::make_shared<Accelerator>(tokens->next()->text);
+          std::shared_ptr<Accelerator> accelerator
+            = std::make_shared<Accelerator>(token->loc,tokens->next()->text);
           parseParams(accelerator->param,*tokens);
           continue;
         }
         if (token->text == "Film") {
-          std::shared_ptr<Film> film = std::make_shared<Film>(tokens->next()->text);
+          std::shared_ptr<Film> film
+            = std::make_shared<Film>(token->loc,tokens->next()->text);
           parseParams(film->param,*tokens);
           continue;
         }
         if (token->text == "Accelerator") {
-          std::shared_ptr<Accelerator> accelerator = std::make_shared<Accelerator>(tokens->next()->text);
+          std::shared_ptr<Accelerator> accelerator
+            = std::make_shared<Accelerator>(token->loc,tokens->next()->text);
           parseParams(accelerator->param,*tokens);
           continue;
         }
         if (token->text == "Renderer") {
-          std::shared_ptr<Renderer> renderer = std::make_shared<Renderer>(tokens->next()->text);
+          std::shared_ptr<Renderer> renderer
+            = std::make_shared<Renderer>(token->loc,tokens->next()->text);
           parseParams(renderer->param,*tokens);
           continue;
         }

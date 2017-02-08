@@ -195,26 +195,17 @@ namespace pbrt_parser {
     if (!texture)
       throw std::runtime_error("could not find named texture '"+textureName+"'");
 
-    if (texture->mapType == "imagemap") {
-      const FileName resolvedFileName =
-        FileName(basePath) + texture->getParamString("filename");
-      // texture->loc.resolveRelativeFileName(texture->getParamString("filename"));
+    const FileName resolvedFileName =
+      texture->loc.resolveRelativeFileName(texture->getParamString("filename"));
 
-      const int texNodeID = loadAndExportTexture(resolvedFileName);
+    const int texNodeID = loadAndExportTexture(resolvedFileName);
 
-      std::stringstream ss;
-      if (texNodeID >= 0)
-        ss << " <param name=\"" << name << "\" type=\"texture\">" << texNodeID << "</param>" << std::endl;
-      else
-        std::cout << "#pbrt_parser: warning - error in im/exporting texture " << resolvedFileName.str() << std::endl;
-      return ss.str();
-    } else if (texture->mapType == "scale") {
-      std::cout << "#pbrt_parser: found a 'scale' texture type, but not handling this yet" << endl;
-      return "";
-    } else {
-      std::cout << "#pbrt_parser: warning - un-handled texture type '" << texture->mapType << "'" << std::endl;
-      return "";
-    }
+    std::stringstream ss;
+    if (texNodeID >= 0)
+      ss << " <param name=\"" << name << "\" type=\"texture\">" << texNodeID << "</param>" << std::endl;
+    else
+      std::cout << "#pbrt_parser: warning - error in im/exporting texture " << resolvedFileName.str() << std::endl;
+    return ss.str();
   }
   
   /*! export a param we _know_ if a std::string */
@@ -512,7 +503,7 @@ namespace pbrt_parser {
     if (!errMsg.empty())
       std::cout << "Error: " << errMsg << std::endl << std::endl;
     
-    std::cout << "Usage:  ./pbrt2rivl inFileName.pbrt -o outFileName.xml [args]" << std::endl;
+    std::cout << "Usage:  ./pbrt2ospray inFileName.pbrt -o outFileName.xml [args]" << std::endl;
     std::cout << "w/ args: " << std::endl;
     std::cout << "  -o <filename.xml>       specify out-filename" << std::endl;
     std::cout << "  -h|--help               print this help message" << std::endl;
@@ -547,12 +538,12 @@ namespace pbrt_parser {
     if (outFileName.empty()) usage("no output file name specified (-o)");
 
     out = fopen(outFileName.c_str(),"w");
-    bin = fopen((outFileName+".bin").c_str(),"w");
+    bin = fopen((outFileName+"bin").c_str(),"w");
     assert(out);
     assert(bin);
 
     fprintf(out,"<?xml version=\"1.0\"?>\n");
-    fprintf(out,"<BGFscene>\n");
+    fprintf(out,"<ospray>\n");
 
     int thisID = nextNodeID++;
     fprintf(out,"<Material name=\"default\" type=\"OBJMaterial\" id=\"%i\">\n",thisID);
@@ -586,7 +577,7 @@ namespace pbrt_parser {
         fprintf(out,"\n</Group>\n");
       }
 
-      fprintf(out,"</BGFscene>");
+      fprintf(out,"</ospray>");
 
       fclose(out);
       fclose(bin);

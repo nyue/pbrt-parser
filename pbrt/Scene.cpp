@@ -116,7 +116,7 @@ namespace pbrt_parser {
   {
     std::map<std::string,std::shared_ptr<Param> >::const_iterator it=param.find(name);
     if (it == param.end())
-      throw std::runtime_error("parameter not found");
+      throw std::runtime_error("object "+toString()+" doesn't have requested parameter '"+name+"'");
     std::shared_ptr<Param> pr = it->second;
     const std::shared_ptr<ParamT<std::string>> p = std::dynamic_pointer_cast<ParamT<std::string>>(pr);
     if (!p)
@@ -159,11 +159,12 @@ namespace pbrt_parser {
   // ==================================================================
 
   /*! constructor */
-  Shape::Shape(const std::string &type,
+  Shape::Shape(const Loc &loc,
+               const std::string &type,
                std::shared_ptr<Material>   material,
                std::shared_ptr<Attributes> attributes,
                affine3f &transform) 
-    : Node(type), 
+    : Node(loc,type), 
       material(material),
       attributes(attributes),
       transform(transform)
@@ -195,7 +196,7 @@ namespace pbrt_parser {
          it != param.end(); it++) {
       ss << " - " << it->first << " : " << it->second->toString() << endl;
     }
-    ss << "}" << endl;
+    ss << "} (" << loc.toString() << ")" << endl;
     return ss.str();
   }
 
